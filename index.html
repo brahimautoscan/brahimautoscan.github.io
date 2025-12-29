@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>BrahimAutoScan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; }
+body { font-family: 'Cairo', sans-serif; background: linear-gradient(135deg,#f1f5f9,#e0f2f1); margin:0; padding:1rem; }
+h1 { text-align:center; color:#00695c; }
+input { width:100%; padding:0.8rem; margin-bottom:0.7rem; border-radius:12px; border:1px solid #ccc; }
+button { padding:0.7rem 1.2rem; border:none; border-radius:14px; background:#009688; color:white; font-weight:700; cursor:pointer; }
+.product { background:#f9fafb; border:1px solid #e5e7eb; border-radius:18px; padding:1rem; margin-top:0.7rem; display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; }
+.qty-wrapper { display:flex; gap:6px; align-items:center; }
+.qty-btn { width:30px; height:30px; border-radius:50%; background:#009688; color:white; border:none; font-weight:bold; }
+.qty-input { width:50px; text-align:center; border-radius:10px; border:1px solid #ccc; }
+.total-price { display:none; margin-top:1rem; padding:1rem; background:linear-gradient(135deg,#009688,#00796b); color:white; border-radius:18px; text-align:center; font-weight:700; }
+.whatsapp-btn { width:100%; margin-top:1rem; background:#25D366; }
+.voltage-box { background:#e0f2f1; padding:3px 8px; border-radius:12px; font-weight:700; margin-left:6px; display:inline-block; }
+.check-btn { margin-left:6px; background:#4caf50; border-radius:50%; width:30px; height:30px; border:none; color:white; font-weight:bold; cursor:pointer; }
+.popup { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
+.popup-content { background:white; padding:1.2rem; border-radius:18px; width:90%; max-width:400px; text-align:center; }
+</style>
+</head>
+<body>
+<h1>BrahimAutoScan</h1>
+
+<input id="fullname" placeholder="الاسم واللقب">
+<input id="state" placeholder="الولاية">
+<input id="phone" placeholder="رقم الهاتف">
+
+<div style="text-align:center;margin:1rem 0;">
+  <button onclick="selectType('captor')">كابتور فويت وروفولمون</button>
+  <button onclick="selectType('relay')">Relay GPL</button>
+</div>
+
+<!-- Popup فولطاج للكابتور -->
+<div class="popup" id="voltagePopup">
+  <div class="popup-content">
+    <h3>اختر الفولطاج</h3>
+    <label><input type="radio" name="voltage" value="12" checked> 12V</label><br>
+    <label><input type="radio" name="voltage" value="24"> 24V</label><br><br>
+    <button onclick="confirmVoltage()">التالي</button>
+  </div>
+</div>
+
+<div id="products"></div>
+<div class="total-price" id="total">السعر الإجمالي: 0 دج</div>
+<button class="whatsapp-btn" onclick="sendWhatsApp()">إرسال الطلب عبر واتساب</button>
+
+<script>
+const data = {
+  captor: [
+    {n:'كابتور فويت (مع ثقب القرعة)', p:5000},
+    {n:'كابتور فويت وروفولمون (مع ثقب القرعة)', p:6000},
+    {n:'كابتور فويت (بدون ثقب القرعة)', p:6000},
+    {n:'كابتور فويت وروفولمون (بدون ثقب القرعة)', p:10000}
+  ],
+  relay: [
+    {n:'Relay GPL', p:2500}
+  ]
+};
+
+let currentType = '';
+let selectedVoltage = '12';
+const qty = {}; // { 'productName': {count:1, price, voltage} }
+
+function selectType(type){
+  const fullname = document.getElementById('fullname').value;
+  const state = document.getElementById('state').value;
+  const phone = document.getElementById('phone').value;
+  if(!fullname || !state || !phone){
+    alert('املأ المعلومات أولاً');
+    return;
+  }
+  currentType = type;
+  if(type==='captor'){
+    document.getElementById('voltagePopup').style.display = 'flex';
+  } else {
+    showProducts('12'); // Relay دايمًا 12V
+  }
+}
+
+function confirmVoltage(){
+  const radios = document.querySelectorAll('input[name="voltage"]');
+  radios.forEach(r => { if(r.checked) selectedVoltage = r.value; });
+  document.getElementById('voltagePopup').style.display = 'none';
+  showProducts(selectedVoltage);
+}
+
+function showProducts(voltage){
+  const productsDiv = document.getElementById('products');
+  productsDiv.innerHTML=''; // امسح كل المنتجات القديمة قبل عرض الجديد
+
+  data[currentType].forEach(p=>{
+    const productVoltage = (currentType==='relay') ? '12' : voltage;
+    const price = p.p + ((productVoltage==='24' && currentType==='captor') ? 1000 : 0);
+
+    if(!qty[p.n]) qty[p.n] = {count:0, price:price, voltage:productVoltage};
+    else { qty[p.n].voltage = productVoltage; qty[p.n].price = price; }
+
+    const checkedClass = qty[p.n].count>0 ? '✅' : '';
+    const productHTML = `
+      <div class="product" id="prod-${p.n.replace(/\s/g,'')}">
+        <div style="flex:1;">
+          <span>${p.n}</span>
+          <span class="voltage-box">${productVoltage}V</span>
+          <div style="margin-top:4px; color:#00695c; font-weight:600;">السعر: ${price} دج</div>
+        </div>
+        <div class="qty-wrapper">
+          <button class="check-btn" onclick="enableQty('${p.n}')">${checkedClass}</button>
+          <button class="qty-btn" onclick="change('${p.n}',-1)">−</button>
+          <input class="qty-input" value="${qty[p.n].count}" onchange="manualChange('${p.n}',this.value)">
+          <button class="qty-btn" onclick="change('${p.n}',1)">+</button>
+        </div>
+      </div>`;
+    productsDiv.insertAdjacentHTML('beforeend', productHTML);
+    updateInput(p.n);
+  });
+  document.getElementById('total').style.display='block';
+  updateTotal();
+}
+
+function enableQty(name){
+  qty[name].count = 1;
+  updateInput(name);
+  updateTotal();
+}
+
+function change(name,d){
+  qty[name].count = Math.max(0, qty[name].count + d);
+  updateInput(name);
+  updateTotal();
+}
+
+function manualChange(name,value){
+  let val = parseInt(value);
+  if(isNaN(val) || val<0) val=0;
+  qty[name].count = val;
+  updateInput(name);
+  updateTotal();
+}
+
+function updateInput(name){
+  const div = document.getElementById('prod-'+name.replace(/\s/g,''));
+  if(!div) return;
+  const input = div.querySelector('.qty-input');
+  const checkBtn = div.querySelector('.check-btn');
+  input.value = qty[name].count;
+  checkBtn.textContent = qty[name].count>0 ? '✅' : '';
+}
+
+function updateTotal(){
+  let sum = 0;
+  for(let k in qty) if(qty[k].count>0) sum += qty[k].count*qty[k].price;
+  document.getElementById('total').textContent = `السعر الإجمالي: ${sum} دج`;
+}
+
+function sendWhatsApp(){
+  const fullname = document.getElementById('fullname').value;
+  const state = document.getElementById('state').value;
+  const phone = document.getElementById('phone').value;
+  let msg = `طلب جديد\n\nالاسم: ${fullname}\nالولاية: ${state}\nالهاتف: ${phone}\n\n`;
+  let sum = 0;
+  for(let k in qty){
+    if(qty[k].count>0){
+      msg += `- ${k} × ${qty[k].count} [${qty[k].voltage}V] = ${qty[k].count*qty[k].price} دج\n`;
+      sum += qty[k].count*qty[k].price;
+    }
+  }
+  msg += `\nالمجموع: ${sum} دج`;
+  window.open(`https://wa.me/213670408283?text=${encodeURIComponent(msg)}`);
+}
+</script>
+</body>
+</html>
